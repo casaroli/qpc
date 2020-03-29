@@ -1,7 +1,7 @@
 /*****************************************************************************
 * Product: calc1_sub Example
-* Last updated for version 6.4.0
-* Last updated on  2019-02-08
+* Last updated for version 6.5.0
+* Last updated on  2019-03-20
 *
 *                    Q u a n t u m  L e a P s
 *                    ------------------------
@@ -25,11 +25,11 @@
 * GNU General Public License for more details.
 *
 * You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://www.gnu.org/licenses/>.
+* along with this program. If not, see <www.gnu.org/licenses/>.
 *
 * Contact information:
-* https://www.state-machine.com
-* mailto:info@state-machine.com
+* <www.state-machine.com/licensing>
+* <info@state-machine.com>
 *****************************************************************************/
 #include "qpc.h"
 #include "bsp.h"
@@ -45,7 +45,7 @@ int main() {
     QF_init();
     QF_onStartup();
 
-    printf("Calculator example, QEP version: %s\n"
+    printf("Calculator example, QP version: %s\n"
            "Press '0' .. '9'     to enter a digit\n"
            "Press '.'            to enter the decimal point\n"
            "Press '+'            to add\n"
@@ -56,7 +56,7 @@ int main() {
            "Press 'c' or 'C'     to Cancel\n"
            "Press 'e' or 'E'     to Cancel Entry\n"
            "Press <Esc>          to quit.\n\n",
-           QEP_getVersion());
+           QP_versionStr);
 
     Calc_ctor(); /* explicitly instantiate the calculator object */
     QHSM_INIT(the_calc, (QEvt *)0); /* trigger initial transition */
@@ -64,7 +64,7 @@ int main() {
     for (;;) { /* event loop */
         CalcEvt e; /* Calculator event */
 
-        BSP_display(); /* show the display */
+        BSP_show_display(); /* show the display */
 
         printf(": ");
         fflush(stdout);

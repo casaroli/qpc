@@ -1,17 +1,17 @@
 /**
 * @file
-* @brief QUTEST port to POSIX
+* @brief QS/C QUTest port to POSIX
 * @ingroup ports
 * @cond
 ******************************************************************************
-* Last updated for version 6.4.0
-* Last updated on  2019-02-10
+* Last updated for version 6.8.0
+* Last updated on  2020-01-18
 *
 *                    Q u a n t u m  L e a P s
 *                    ------------------------
 *                    Modern Embedded Software
 *
-* Copyright (C) 2005-2019 Quantum Leaps, LLC. All rights reserved.
+* Copyright (C) 2005-2020 Quantum Leaps, LLC. All rights reserved.
 *
 * This program is open source software: you can redistribute it and/or
 * modify it under the terms of the GNU General Public License as published
@@ -29,11 +29,11 @@
 * GNU General Public License for more details.
 *
 * You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://www.gnu.org/licenses/>.
+* along with this program. If not, see <www.gnu.org/licenses/>.
 *
 * Contact information:
-* https://www.state-machine.com
-* mailto:info@state-machine.com
+* <www.state-machine.com/licensing>
+* <info@state-machine.com>
 ******************************************************************************
 * @endcond
 */
@@ -41,13 +41,14 @@
 #define _POSIX_C_SOURCE 200809L
 
 #ifndef Q_SPY
-    #error "Q_SPY must be defined for QTEST application"
+    #error "Q_SPY must be defined to compile qutest_port.c"
 #endif /* Q_SPY */
 
 #define QP_IMPL       /* this is QP implementation */
 #include "qf_port.h"  /* QF port */
 #include "qassert.h"  /* QP embedded systems-friendly assertions */
-#include "qs_port.h"  /* include QS port */
+#include "qs_port.h"  /* QS port */
+#include "qs_pkg.h"   /* QS package-scope interface */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,7 +69,7 @@
 #define QS_TX_SIZE     (8*1024)
 #define QS_RX_SIZE     (2*1024)
 #define QS_TX_CHUNK    QS_TX_SIZE
-#define QS_IMEOUT_MS   10
+#define QS_TIMEOUT_MS  10
 
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR   -1
@@ -99,7 +100,7 @@ uint8_t QS_onStartup(void const *arg) {
     QS_rxInitBuf(qsRxBuf, sizeof(qsRxBuf));
 
     /* extract hostName from 'arg' (hostName:port_remote)... */
-    src = (arg != (void const *)0)
+    src = (arg != (void *)0)
           ? (char const *)arg
           : "localhost"; /* default QSPY host */
     dst = hostName;
@@ -111,12 +112,10 @@ uint8_t QS_onStartup(void const *arg) {
     }
     *dst = '\0'; /* zero-terminate hostName */
 
-    /* extract port_remote from 'arg' (hostName:port_remote)... */
+    /* extract serviceName from 'arg' (hostName:serviceName)... */
     if (*src == ':') {
         serviceName = src + 1;
     }
-    //printf("<TARGET> Connecting to QSPY on Host=%s:%s...\n",
-    //       hostName, serviceName);
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -176,19 +175,16 @@ uint8_t QS_onStartup(void const *arg) {
     sockopt_bool = 0; /* negative option */
     setsockopt(l_sock, SOL_SOCKET, SO_LINGER,
                &sockopt_bool, sizeof(sockopt_bool));
-
-    //printf("<TARGET> Connected to QSPY at Host=%s:%d\n",
-    //       hostName, port_remote);
     QS_onFlush();
 
     /* install the SIGINT (Ctrl-C) signal handler */
     sig_act.sa_handler = &sigIntHandler;
     sigaction(SIGINT, &sig_act, NULL);
 
-    return (uint8_t)1; /* success */
+    return 1U; /* success */
 
 error:
-    return (uint8_t)0; /* failure */
+    return 0U; /* failure */
 }
 /*..........................................................................*/
 void QS_onCleanup(void) {
@@ -207,7 +203,7 @@ void QS_onReset(void) {
 void QS_onFlush(void) {
     uint16_t nBytes;
     uint8_t const *data;
-    static struct timespec const c_10ms = { 0, 10000000L };
+    static struct timespec const c_timeout = { 0, QS_TIMEOUT_MS*1000000L };
 
     if (l_sock == INVALID_SOCKET) { /* socket NOT initialized? */
         fprintf(stderr, "<TARGET> ERROR   invalid TCP socket\n");
@@ -220,10 +216,10 @@ void QS_onFlush(void) {
             int nSent = send(l_sock, (char const *)data, (int)nBytes, 0);
             if (nSent == SOCKET_ERROR) { /* sending failed? */
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-                    /* sleep for 10ms and then loop back
+                    /* sleep for the timeout and then loop back
                     * to send() the SAME data again
                     */
-                    nanosleep(&c_10ms, NULL);
+                    nanosleep(&c_timeout, NULL);
                 }
                 else { /* some other socket error... */
                     fprintf(stderr, "<TARGET> ERROR   sending data over TCP,"
@@ -232,7 +228,7 @@ void QS_onFlush(void) {
                 }
             }
             else if (nSent < (int)nBytes) { /* sent fewer than requested? */
-                nanosleep(&c_10ms, NULL); /* sleep for 10ms */
+                nanosleep(&c_timeout, NULL); /* sleep for the timeout */
                 /* adjust the data and loop back to send() the rest */
                 data   += nSent;
                 nBytes -= (uint16_t)nSent;
@@ -252,15 +248,15 @@ void QS_onTestLoop() {
 
     QS_rxPriv_.inTestLoop = true;
     while (QS_rxPriv_.inTestLoop) {
-        static struct timeval timeout = {
-            (long)0, (long)(QS_IMEOUT_MS * 1000)
+        struct timeval timeout = {
+            (long)0, (long)(QS_TIMEOUT_MS * 1000)
         };
         int nrec;
 
         FD_SET(l_sock, &readSet);
 
         /* selective, timed blocking on the TCP/IP socket... */
-        timeout.tv_usec = (long)(QS_IMEOUT_MS * 1000);
+        timeout.tv_usec = (long)(QS_TIMEOUT_MS * 1000);
         nrec = select(l_sock + 1, &readSet,
                       (fd_set *)0, (fd_set *)0, &timeout);
         if (nrec < 0) {

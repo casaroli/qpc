@@ -4,14 +4,14 @@
 * @ingroup ports
 * @cond
 ******************************************************************************
-* Last updated for version 6.4.0
-* Last updated on  2019-02-08
+* Last updated for version 6.8.0
+* Last updated on  2020-01-18
 *
 *                    Q u a n t u m  L e a P s
 *                    ------------------------
 *                    Modern Embedded Software
 *
-* Copyright (C) 2005-2019 Quantum Leaps, LLC. All rights reserved.
+* Copyright (C) 2005-2020 Quantum Leaps, LLC. All rights reserved.
 *
 * This program is open source software: you can redistribute it and/or
 * modify it under the terms of the GNU General Public License as published
@@ -29,22 +29,23 @@
 * GNU General Public License for more details.
 *
 * You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://www.gnu.org/licenses/>.
+* along with this program. If not, see <www.gnu.org/licenses>.
 *
 * Contact information:
-* https://www.state-machine.com
-* mailto:info@state-machine.com
+* <www.state-machine.com/licensing>
+* <info@state-machine.com>
 ******************************************************************************
 * @endcond
 */
 #ifndef Q_SPY
-    #error "Q_SPY must be defined for QTEST application"
+    #error "Q_SPY must be defined to compile qutest_port.c"
 #endif /* Q_SPY */
 
 #define QP_IMPL       /* this is QP implementation */
 #include "qf_port.h"  /* QF port */
 #include "qassert.h"  /* QP embedded systems-friendly assertions */
-#include "qs_port.h"  /* include QS port */
+#include "qs_port.h"  /* QS port */
+#include "qs_pkg.h"   /* QS package-scope interface */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +70,7 @@
 #define QS_TX_SIZE     (8*1024)
 #define QS_RX_SIZE     (2*1024)
 #define QS_TX_CHUNK    QS_TX_SIZE
-#define QS_IMEOUT_MS   10
+#define QS_TIMEOUT_MS  10
 
 /* local variables .........................................................*/
 static SOCKET l_sock = INVALID_SOCKET;
@@ -79,7 +80,7 @@ uint8_t QS_onStartup(void const *arg) {
     static uint8_t qsBuf[QS_TX_SIZE];   /* buffer for QS-TX channel */
     static uint8_t qsRxBuf[QS_RX_SIZE]; /* buffer for QS-RX channel */
     char hostName[128];
-    char const *serviceName = "6601";  /* default QSPY server port */
+    char const *serviceName = "6601";   /* default QSPY server port */
     char const *src;
     char *dst;
     int status;
@@ -95,15 +96,15 @@ uint8_t QS_onStartup(void const *arg) {
     QS_initBuf(qsBuf, sizeof(qsBuf));
     QS_rxInitBuf(qsRxBuf, sizeof(qsRxBuf));
 
-    /* initialize Windows sockets */
-    if (WSAStartup(MAKEWORD(2,2), &wsaData) != NO_ERROR) {
+    /* initialize Windows sockets version 2.2 */
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != NO_ERROR) {
         fprintf(stderr,
             "<TARGET> ERROR Windows Sockets cannot be initialized\n");
         goto error;
     }
 
     /* extract hostName from 'arg' (hostName:port_remote)... */
-    src = (arg != (void const *)0)
+    src = (arg != (void *)0)
           ? (char const *)arg
           : "localhost"; /* default QSPY host */
     dst = hostName;
@@ -115,12 +116,10 @@ uint8_t QS_onStartup(void const *arg) {
     }
     *dst = '\0'; /* zero-terminate hostName */
 
-    /* extract port_remote from 'arg' (hostName:port_remote)... */
+    /* extract serviceName from 'arg' (hostName:serviceName)... */
     if (*src == ':') {
         serviceName = src + 1;
     }
-    //printf("<TARGET> Connecting to QSPY on Host=%s:%s...\n",
-    //       hostName, serviceName);
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -172,15 +171,12 @@ uint8_t QS_onStartup(void const *arg) {
     sockopt_bool = TRUE;
     setsockopt(l_sock, SOL_SOCKET, SO_DONTLINGER,
                (const char *)&sockopt_bool, sizeof(sockopt_bool));
-
-    //printf("<TARGET> Connected to QSPY at Host=%s:%d\n",
-    //       hostName, port_remote);
     QS_onFlush();
 
-    return (uint8_t)1; /* success */
+    return 1U; /* success */
 
 error:
-    return (uint8_t)0; /* failure */
+    return 0U; /* failure */
 }
 /*..........................................................................*/
 void QS_onCleanup(void) {
@@ -213,10 +209,10 @@ void QS_onFlush(void) {
             if (nSent == SOCKET_ERROR) { /* sending failed? */
                 int err = WSAGetLastError();
                 if (err == WSAEWOULDBLOCK) {
-                    /* sleep for 10ms and then loop back
+                    /* sleep for the timeout and then loop back
                     * to send() the SAME data again
                     */
-                    Sleep(10);
+                    Sleep(QS_TIMEOUT_MS);
                 }
                 else { /* some other socket error... */
                     fprintf(stderr, "<TARGET> ERROR   sending data over TCP,"
@@ -225,7 +221,7 @@ void QS_onFlush(void) {
                 }
             }
             else if (nSent < (int)nBytes) { /* sent fewer than requested? */
-                Sleep(10); /* sleep for 10ms */
+                Sleep(QS_TIMEOUT_MS); /* sleep for the timeout */
                 /* adjust the data and loop back to send() the rest */
                 data   += nSent;
                 nBytes -= (uint16_t)nSent;
@@ -245,11 +241,11 @@ void QS_onTestLoop() {
 
     QS_rxPriv_.inTestLoop = true;
     while (QS_rxPriv_.inTestLoop) {
-        static struct timeval const timeout = {
-            (long)0, (long)(QS_IMEOUT_MS * 1000)
+        struct timeval timeout = {
+            (long)0, (long)(QS_TIMEOUT_MS * 1000)
         };
         int status;
-        int ch;
+        wint_t ch;
 
         FD_SET(l_sock, &readSet);
 
@@ -264,7 +260,7 @@ void QS_onTestLoop() {
         }
         else if (FD_ISSET(l_sock, &readSet)) { /* socket ready to read? */
             uint8_t buf[QS_RX_SIZE];
-            int status = recv(l_sock, (char *)buf, (int)sizeof(buf), 0);
+            status = recv(l_sock, (char *)buf, (int)sizeof(buf), 0);
             while (status > 0) { /* any data received? */
                 uint8_t *pb;
                 int i = (int)QS_rxGetNfree();
@@ -285,7 +281,7 @@ void QS_onTestLoop() {
 
         ch = 0;
         while (_kbhit()) { /* any key pressed? */
-            ch = _getch();
+            ch = _getwch();
         }
         switch (ch) {
             case 'x':      /* 'x' pressed? */

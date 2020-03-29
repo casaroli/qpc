@@ -1,49 +1,23 @@
 /*! @page gs Getting Started
 
-@section gs_help Using the QP&trade; Help
-<p>You can use this QP&trade; Help in various ways: either sequentially from beginning to end or just by quickly locating the interesting topic.
-</p>
+@section gs_obtain Downloading &amp; Installing QP/C&trade;
+@tableofcontents
 
-@image html qp_help_using.jpg "QP Documentation View Features"
+<p>The most recommended way of obtaining QP/C&trade; is by downloading the <a class="extern" target="_blank" href="https://www.state-machine.com/#Downloads"><b>QP-bundle&trade;</b></a>, which includes QP/C&trade; as well as other QP frameworks and also the <a class="extern" target="_blank" href="https://www.state-machine.com/qm/">QM&trade; modeling tool</a> and the <a class="extern" target="_blank" href="https://www.state-machine.com/products/">QTools&trade; collection</a>. The main advantage of obtaining QP/C&trade; bundled together like that is that you get all components, tools and examples ready to go.
 
-
-<div class="separate"></div>
-@subsection gs_help_seq Reading QP&trade; Help Sequentially
-You can move from topic to topic by means of the <span class="strong underline">Next:</span> link at the bottom of each page.
-
-
-<div class="separate"></div>
-@subsection gs_help_random Quickly Locating a Topic of Interest
-You can use the following elements:
-
-- the @ref gs_tree_view "Tree View" pane on the left-hand side of the browser;
-
-- the **Table of Contents** box in the top-right corner of the page;
-
-- the **Search** box in the upper-right corner of the browser window
-
-
-<div class="separate"></div>
-@subsection gs_tree_view Using the Tree View
-The *Tree View* pane on the left-hand side of the browser displays the hierarchical Table of Contents, which can be either **linked-to** or **unlinked-from** the *Current Topic* displayed on the right-hand side. You can toggle between the two modes by pressing the **Link/Unlink Current Topic** icon at the top of the *Tree View* pane.
-
-<img src="img/tree-view_linked.png" style="float:left; margin-right:10px;">
-When the *Tree View* is **linked** to the Current Topic, the *Tree View* will always follow the currently viewed topic, by expanding and highlighting the pertinent section of the hierarchical Table of Contents.
-
-<div style="clear:both;"></div>
-<img src="img/tree-view_unlinked.png" style="float:left; margin-right:10px;">
-When the *Tree View* is **unlinked** from the Current Topic, the *Tree View* will show only the explicitly selected section of the hierarchical Table of Contents and will **not** follow the topics activated by internal documentation links.
+@note
+<a class="extern" target="_blank" href="https://www.state-machine.com/#Downloads"><strong>QP-bundle&trade;</strong></a> is the **most recommended** way of downloading and installing QP/C&trade;. However, if you are allergic to installers and GUIs or don't have administrator privileges you can also **download and install QP/C&trade; separately** as described in the Application Note: "Getting Started with QP/C" below.
 
 
 ------------------------------------------------------------------------------
-@section gs_an Getting Started with QP/C App Note
-The Quantum Leaps Application Note <a class="extern" target="_blank" href="https://www.state-machine.com/doc/AN_Getting_Started_with_QPC.pdf"><strong>Getting Started with QP/C</strong></a> provides step-by-step instructions on how to download, install, and get started with QP/C quickly. The application note also contains a **QP/C Tutorial**, in which you build a simple "Blinky" application.
+@section gs_an Getting Started with QP/C&trade; App Note
+The Quantum Leaps Application Note <a class="extern" target="_blank" href="https://www.state-machine.com/doc/AN_Getting_Started_with_QPC.pdf"><strong>Getting Started with QP/C</strong></a> provides instructions on how to download, install and get started with QP/C quickly. The application note also contains a **QP/C Tutorial**, in which you build a simple "Blinky" application.
 
 @htmlonly
 <div class="image">
 <a target="_blank" href="https://www.state-machine.com/doc/AN_Getting_Started_with_QPC.pdf"><img border="0" src="img/AN_Getting_Started_with_QPC.jpg" title="Download PDF"></a>
 <div class="caption">
-Application Note: Getting Started with QP/C
+Application Note: Getting Started with QP/C&trade;
 </div>
 </div>
 @endhtmlonly

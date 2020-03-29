@@ -4,8 +4,8 @@
 * @ingroup ports
 * @cond
 ******************************************************************************
-* Last updated for version 6.4.0
-* Last updated on  2019-02-10
+* Last Updated for Version: 6.5.1
+* Date of the Last Update:  2019-06-18
 *
 *                    Q u a n t u m  L e a P s
 *                    ------------------------
@@ -29,11 +29,11 @@
 * GNU General Public License for more details.
 *
 * You should have received a copy of the GNU General Public License
-* along with this program. If not, see <http://www.gnu.org/licenses/>.
+* along with this program. If not, see <www.gnu.org/licenses/>.
 *
 * Contact information:
-* https://www.state-machine.com
-* mailto:info@state-machine.com
+* <www.state-machine.com/licensing>
+* <info@state-machine.com>
 ******************************************************************************
 * @endcond
 */
@@ -66,13 +66,14 @@
 #define QS_TX_SIZE     (8*1024)
 #define QS_RX_SIZE     (2*1024)
 #define QS_TX_CHUNK    QS_TX_SIZE
+#define QS_TIMEOUT_MS  10
 
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR   -1
 
 /* local variables .........................................................*/
 static int l_sock = INVALID_SOCKET;
-static struct timespec const c_10ms = { 0, 10000000L };
+static struct timespec const c_timeout = { 0, QS_TIMEOUT_MS*1000000L };
 
 /*..........................................................................*/
 uint8_t QS_onStartup(void const *arg) {
@@ -94,7 +95,7 @@ uint8_t QS_onStartup(void const *arg) {
     QS_rxInitBuf(qsRxBuf, sizeof(qsRxBuf));
 
     /* extract hostName from 'arg' (hostName:port_remote)... */
-    src = (arg != (void const *)0)
+    src = (arg != (void *)0)
           ? (char const *)arg
           : "localhost"; /* default QSPY host */
     dst = hostName;
@@ -106,12 +107,10 @@ uint8_t QS_onStartup(void const *arg) {
     }
     *dst = '\0'; /* zero-terminate hostName */
 
-    /* extract port_remote from 'arg' (hostName:port_remote)... */
+    /* extract serviceName from 'arg' (hostName:serviceName)... */
     if (*src == ':') {
         serviceName = src + 1;
     }
-    //printf("<TARGET> Connecting to QSPY on Host=%s:%s...\n",
-    //       hostName, serviceName);
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -171,15 +170,12 @@ uint8_t QS_onStartup(void const *arg) {
     sockopt_bool = 0; /* negative option */
     setsockopt(l_sock, SOL_SOCKET, SO_LINGER,
                &sockopt_bool, sizeof(sockopt_bool));
-
-    //printf("<TARGET> Connected to QSPY at Host=%s:%d\n",
-    //       hostName, port_remote);
     QS_onFlush();
 
-    return (uint8_t)1; /* success */
+    return 1U; /* success */
 
 error:
-    return (uint8_t)0; /* failure */
+    return 0U; /* failure */
 }
 /*..........................................................................*/
 void QS_onCleanup(void) {
@@ -198,6 +194,7 @@ void QS_onReset(void) {
 void QS_onFlush(void) {
     uint16_t nBytes;
     uint8_t const *data;
+    QS_CRIT_STAT_
 
     if (l_sock == INVALID_SOCKET) { /* socket NOT initialized? */
         fprintf(stderr, "<TARGET> ERROR   invalid TCP socket\n");
@@ -205,15 +202,17 @@ void QS_onFlush(void) {
     }
 
     nBytes = QS_TX_CHUNK;
+    QS_CRIT_ENTRY_();
     while ((data = QS_getBlock(&nBytes)) != (uint8_t *)0) {
+        QS_CRIT_EXIT_();
         for (;;) { /* for-ever until break or return */
             int nSent = send(l_sock, (char const *)data, (int)nBytes, 0);
             if (nSent == SOCKET_ERROR) { /* sending failed? */
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-                    /* sleep for 10ms and then loop back
+                    /* sleep for the timeout and then loop back
                     * to send() the SAME data again
                     */
-                    nanosleep(&c_10ms, NULL);
+                    nanosleep(&c_timeout, NULL);
                 }
                 else { /* some other socket error... */
                     fprintf(stderr, "<TARGET> ERROR   sending data over TCP,"
@@ -222,7 +221,7 @@ void QS_onFlush(void) {
                 }
             }
             else if (nSent < (int)nBytes) { /* sent fewer than requested? */
-                nanosleep(&c_10ms, NULL); /* sleep for 10ms */
+                nanosleep(&c_timeout, NULL); /* sleep for the timeout */
                 /* adjust the data and loop back to send() the rest */
                 data   += nSent;
                 nBytes -= (uint16_t)nSent;
@@ -233,7 +232,9 @@ void QS_onFlush(void) {
         }
         /* set nBytes for the next call to QS_getBlock() */
         nBytes = QS_TX_CHUNK;
+        QS_CRIT_ENTRY_();
     }
+    QS_CRIT_EXIT_();
 }
 /*..........................................................................*/
 QSTimeCtr QS_onGetTime(void) {
@@ -250,6 +251,7 @@ QSTimeCtr QS_onGetTime(void) {
 void QS_output(void) {
     uint16_t nBytes;
     uint8_t const *data;
+    QS_CRIT_STAT_
 
     if (l_sock == INVALID_SOCKET) { /* socket NOT initialized? */
         fprintf(stderr, "<TARGET> ERROR   invalid TCP socket\n");
@@ -257,15 +259,17 @@ void QS_output(void) {
     }
 
     nBytes = QS_TX_CHUNK;
+    QS_CRIT_ENTRY_();
     if ((data = QS_getBlock(&nBytes)) != (uint8_t *)0) {
+        QS_CRIT_EXIT_();
         for (;;) { /* for-ever until break or return */
             int nSent = send(l_sock, (char const *)data, (int)nBytes, 0);
             if (nSent == SOCKET_ERROR) { /* sending failed? */
                 if ((errno == EWOULDBLOCK) || (errno == EAGAIN)) {
-                    /* sleep for 10ms and then loop back
+                    /* sleep for the timeout and then loop back
                     * to send() the SAME data again
                     */
-                    nanosleep(&c_10ms, NULL);
+                    nanosleep(&c_timeout, NULL);
                 }
                 else { /* some other socket error... */
                     fprintf(stderr, "<TARGET> ERROR   sending data over TCP,"
@@ -274,7 +278,7 @@ void QS_output(void) {
                 }
             }
             else if (nSent < (int)nBytes) { /* sent fewer than requested? */
-                nanosleep(&c_10ms, NULL); /* sleep for 10ms */
+                nanosleep(&c_timeout, NULL); /* sleep for the timeout */
                 /* adjust the data and loop back to send() the rest */
                 data   += nSent;
                 nBytes -= (uint16_t)nSent;
@@ -283,6 +287,9 @@ void QS_output(void) {
                 break;
             }
         }
+    }
+    else {
+        QS_CRIT_EXIT_();
     }
 }
 /*..........................................................................*/
